@@ -537,13 +537,7 @@ function startExam(){
   if(!n){alert('Please enter your full name before starting.');document.getElementById('student-name').focus();return;}
   S.name=n; S.startTime=new Date();
   DOMAINS.forEach(d=>LEVELS.forEach(l=>{ S.data[dk(d.id,l)]={response:'',verdict:'',attempts:0,feedback:''}; }));
-  show('screen-question');
-  try {
-    loadQ();
-  } catch(err) {
-    document.getElementById('questionText').textContent = 'DEBUG ERROR: ' + err.message + ' | stack: ' + err.stack;
-    document.getElementById('questionText').style.color = 'red';
-  }
+  show('screen-question'); loadQ();
 }
 
 function show(id){
@@ -590,6 +584,8 @@ function loadQ(){
   updateMap(); updateGradeBar(); updatePB();
   setTimeout(()=>g('levelBadge').focus(),100);
 }
+
+function g(id){return document.getElementById(id)}
 
 function toggleGuidance(){
   const content=g('guidanceContent');
