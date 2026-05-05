@@ -566,8 +566,9 @@ function loadQ(){
 
   // Show guidance text matching this domain and level
   const guidanceEl=g('guidanceText');
-  if(guidanceEl && GUIDANCE[level] && GUIDANCE[level][domain.id]){
-    guidanceEl.textContent=GUIDANCE[level][domain.id];
+  if(guidanceEl){
+    const txt=(GUIDANCE[lv]||{})[dom.id]||'';
+    guidanceEl.textContent=txt;
     openGuidance();
   }
   g('responseArea').value=''; g('charCount').textContent='0 / 3000 characters';
