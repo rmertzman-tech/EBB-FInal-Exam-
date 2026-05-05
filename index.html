@@ -548,11 +548,17 @@ async function submitResponse(){
   g('companionText').textContent='Reading what you wrote...';
   g('companionText').className='companion-text thinking';
   const qs=dom.questions[lv]; const qi=rec.attempts%qs.length; const qText=qs[qi]||qs[0];
+
+  const controller=new AbortController();
+  const timeoutId=setTimeout(()=>controller.abort(),25000);
+
   try{
     const res=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,
+      signal:controller.signal,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:700,
         system:buildSys(dom,lv,rec.attempts>1),
         messages:[{role:'user',content:buildMsg(qText,resp,rec.attempts>1,rec.response)}]})});
+    clearTimeout(timeoutId);
     const data=await res.json();
     const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||data.response||'';
     const verdict=parseV(reply);
@@ -563,9 +569,14 @@ async function submitResponse(){
     g('askBtn').style.display='none';
     updateMap(); updateGradeBar();
   }catch(e){
-    g('companionText').textContent='Could not reach the course backend. Please check your connection and try again.';
-    g('companionText').className='companion-text thinking';
+    clearTimeout(timeoutId);
     btn.disabled=false; btn.textContent='Try Again →';
+    if(e.name==='AbortError'){
+      g('companionText').textContent='The server took too long. Please try again — it usually works on the second attempt.';
+    } else {
+      g('companionText').textContent='Could not reach the course backend. Please check your connection and try again.';
+    }
+    g('companionText').className='companion-text thinking';
   }
 }
 
