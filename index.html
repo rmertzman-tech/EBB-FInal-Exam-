@@ -551,7 +551,13 @@ function loadQ(){
   const dom=DOMAINS[S.di], lv=LEVELS[S.li];
   const key=dk(dom.id,lv), rec=S.data[key];
   const qs=dom.questions[lv];
-  const qi=rec.attempts%qs.length;
+
+  // Lock the question index on first load — never rotate during retries.
+  // Rotation across sessions is fine; rotation during a single attempt session breaks retries.
+  if(rec.questionIdx===undefined){
+    rec.questionIdx = (dom.id + S.li) % qs.length; // deterministic but varies by domain/level
+  }
+  const qi = rec.questionIdx;
 
   g('domainBadge').textContent=dom.badge;
   g('domainTitle').textContent=dom.name;
@@ -623,7 +629,8 @@ async function submitResponse(){
   g('companionVerdict').textContent='';
   g('companionText').textContent='Reading what you wrote...';
   g('companionText').className='companion-text thinking';
-  const qs=dom.questions[lv]; const qi=rec.attempts%qs.length; const qText=qs[qi]||qs[0];
+  const qs=dom.questions[lv];
+  const qText=qs[rec.questionIdx!==undefined ? rec.questionIdx : 0];
 
   const controller=new AbortController();
   const timeoutId=setTimeout(()=>controller.abort(),25000);
@@ -633,7 +640,7 @@ async function submitResponse(){
       signal:controller.signal,
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:700,
         system:buildSys(dom,lv,rec.attempts>1),
-        messages:[{role:'user',content:buildMsg(qText,resp,rec.attempts>1,rec.response)}]})});
+        messages:[{role:'user',content:buildMsg(qText,resp,rec.attempts>1,rec.response,rec.attempts)}]})});
     clearTimeout(timeoutId);
     const data=await res.json();
     const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('')||data.response||'';
@@ -658,33 +665,38 @@ async function submitResponse(){
 
 function buildSys(dom,lv,isRetry){
   const li={
-    recognition:'RECOGNITION: Student must accurately name and describe the concept in their own words — does not need the exact technical term, but must show functional understanding.',
-    application:'APPLICATION: Student must apply the EBB framework to the specific case provided — not just describe the framework generally. Generic descriptions without genuine case application = Partially Demonstrated.',
-    integration:'INTEGRATION: Student must apply the framework to their own real experience with specific, honest detail. Generic or hypothetical responses = Partially Demonstrated. This cannot be answered by AI alone — the student must supply the experiential evidence.'
+    recognition:`RECOGNITION — LOW BAR. The student just needs to show they genuinely understand the concept. They do NOT need to use the official EBB term. If they explain the idea clearly in their own words and show they understand why it matters, mark it DEMONSTRATED. Be generous. A student who says "it's like the lens you see the world through, shaped by how you were raised" has demonstrated recognition of PRF even without saying "Phenomenological Reference Frame." Only mark NOT YET if they are describing something completely unrelated.`,
+    application:`APPLICATION — MODERATE BAR. The student needs to connect the concept to the specific scenario. Accept genuine attempts that get the main idea right. If they miss a detail, ask ONE simple friendly question to help them add it.`,
+    integration:`INTEGRATION — PERSONAL CONNECTION. Accept any honest personal example that genuinely connects to the concept, even if the language is imprecise. The goal is that they have made the idea real and personal.`
   };
-  return `You are the EBB Companion, assessing a final exam response for an Ethics Beyond Boundaries course at Saint Petersburg College. These are freshman community college students — many work significant hours and have real institutional experience. Be warm, precise, and honest. Do not condescend.
+  return `You are the EBB Companion — a warm, encouraging conversation partner for freshman students in an Ethics Beyond Boundaries course at Saint Petersburg College. These students work full-time jobs, raise families, and many have never taken a philosophy course. Treat them with respect and patience.
+
+YOUR MOST IMPORTANT RULE: The guidance box told students "you don't need to use the exact technical term." You MUST honor this. If a student clearly understands the concept and explains it in their own words — even imprecisely — mark it DEMONSTRATED. Do NOT hold out for specific vocabulary.
 
 Domain: ${dom.name} | Level: ${LV_LABEL[lv]}
 ${li[lv]}
 
-CRITICAL INSTRUCTION: The student was shown a guidance box telling them what a complete response includes. Your job when a response is incomplete is NOT to list what they missed — that creates an unfair gotcha experience. Instead, ask ONE specific question that invites them to provide the missing element naturally.
-
-RESPONSE FORMAT — begin with exactly one of these:
+Start your response with exactly one verdict line:
 VERDICT: DEMONSTRATED
 VERDICT: PARTIALLY DEMONSTRATED
 VERDICT: NOT YET
 
-Then 3–5 sentences:
-- DEMONSTRATED: Tell them specifically what they demonstrated well. For Integration level, ask one final deepening question to extend the insight.
-- PARTIALLY DEMONSTRATED: Briefly acknowledge what they showed. Then ask ONE specific question that points toward what would make the response complete — without stating what is missing. The question should be answerable by someone who understands the concept. Example: not "you forgot to explain X" but "Can you say a bit more about whether this was something they chose, or something that happened to them?"
-- NOT YET: Be warm and encouraging. Ask one simpler entry question that gives them a way in — something concrete and personal that would get the conversation started.
+Then 2-3 warm plain sentences:
+- DEMONSTRATED: Say what they got right. Be specific and warm.
+- PARTIALLY DEMONSTRATED: Affirm what they showed. Ask ONE simple concrete question to help them add what's missing. No jargon in your question.
+- NOT YET: Be encouraging. Ask one very simple question anyone could answer from their own experience. Sound like a helpful tutor, not a grader.
 
-Under 160 words total. Plain, conversational language — this is a dialogue, not a grading rubric.${isRetry?' This is a retry — briefly acknowledge they are continuing to work on it, then move directly to the question.':''}`;
+${isRetry?'IMPORTANT: This student has tried multiple times and is struggling. Lower your bar significantly. Accept approximate understanding. One more kind nudge — make it easy for them to succeed.':''}
+
+Under 100 words. Plain everyday language only. No academic jargon.`;
 }
 
-function buildMsg(q,resp,isRetry,prev){
+function buildMsg(q,resp,isRetry,prev,attempts){
   let c='QUESTION:\n'+q+'\n\nSTUDENT RESPONSE:\n'+resp;
-  if(isRetry&&prev)c+='\n\nNOTE: This is a retry. Previous response:\n'+prev+'\nAssess whether the new response adds substantive new evidence, not just rephrasing.';
+  if(isRetry&&prev){
+    c+='\n\nNOTE: This is attempt #'+(attempts||2)+'. Previous response:\n'+prev;
+    if((attempts||2)>=3) c+='\n\nThis student has tried 3+ times. Please be very generous and help them over the line.';
+  }
   return c;
 }
 
