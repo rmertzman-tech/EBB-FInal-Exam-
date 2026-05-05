@@ -217,7 +217,8 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
     <p>Before you write, you will see a teal box titled <strong>"What the Companion looks for in a complete response."</strong> Read this before you write — it tells you exactly what a complete answer includes. The Companion's assessment is based on those criteria, so knowing them upfront is part of how this works.</p>
     <p>After you submit, the Companion will tell you what you demonstrated and — if something is missing — ask you a specific question to help you add it. This is a conversation, not a test. The Companion will never tell you that you "forgot" something or "should have included" something that wasn't in the guidance. If it asks a follow-up question, it is inviting you to go deeper, not penalizing you for what you wrote.</p>
     <p>You can retry any question as many times as you need. Each retry should add something new — not just restate what you already wrote.</p>
-    <p>There is no time limit. Your instructor has posted a submission due date on Canvas.</p>
+    <p>There is no time limit. Your instructor has posted a submission due date on Canvas. If you need to stop before finishing, click <strong>"Submit what I have"</strong> in the top bar at any time — you will get credit for everything you have demonstrated so far. You can also submit again later if you want to improve your grade, as long as your instructor accepts multiple submissions.</p>
+    <p>If you are on a public or shared computer, click <strong>"Save to file"</strong> in the top bar at any point during the exam. This downloads a small file you can save to a USB drive or email to yourself. Next time you open the exam — on any computer — use the <strong>"Load progress from file"</strong> option on this screen to pick up exactly where you left off.</p>
   </div>
 
   <div class="info-box">
@@ -239,6 +240,47 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
   </div>
 
   <div class="spacer"></div>
+
+  <!-- Resume banner — shown if saved progress exists -->
+  <div id="resumeBanner" style="display:none;background:var(--amber-l);
+    border:1px solid rgba(138,60,12,.3);border-radius:.5rem;
+    padding:1rem 1.2rem;margin-bottom:1.2rem;max-width:640px;">
+    <p style="font-family:var(--sans);font-size:.85rem;font-weight:700;
+      color:var(--amber);margin-bottom:.4rem;">
+      You have a saved exam session
+    </p>
+    <p id="resumeDesc" style="font-size:1rem;color:var(--ink2);margin-bottom:.75rem;line-height:1.7;"></p>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="doResume()"
+        style="background:var(--amber);border-color:var(--amber);">
+        Resume where I left off
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="doFresh()"
+        style="color:var(--muted);border-color:var(--muted);font-size:.8rem;">
+        Start fresh (clears saved progress)
+      </button>
+    </div>
+  </div>
+
+  <!-- Upload saved file — for students on public computers -->
+  <div style="background:var(--teal-ll);border:1px solid rgba(13,94,87,.25);
+    border-radius:.5rem;padding:1rem 1.2rem;margin-bottom:1.2rem;max-width:640px;">
+    <p style="font-family:var(--sans);font-size:.85rem;font-weight:700;
+      color:var(--teal);margin-bottom:.3rem;">
+      Continuing on a different computer?
+    </p>
+    <p style="font-size:1rem;color:var(--ink2);margin-bottom:.75rem;line-height:1.7;">
+      If you saved a progress file on another computer, upload it here to continue where you left off.
+    </p>
+    <label for="uploadSave" class="btn btn-ghost btn-sm"
+      style="cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;">
+      &#8679; Load progress from file
+    </label>
+    <input type="file" id="uploadSave" accept=".ebbsave,.json"
+      style="display:none;" onchange="uploadSaveFile(event)">
+    <p id="uploadStatus" style="font-size:.9rem;color:var(--muted);margin-top:.5rem;display:none;"></p>
+  </div>
+
   <label for="student-name">Your full name (as it appears on Canvas)</label>
   <input type="text" id="student-name" autocomplete="name"
     placeholder="First Last" maxlength="80"
@@ -257,6 +299,16 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
 <header class="top-bar" role="banner">
   <span class="top-bar-title" id="topbar-domain">EBB Final Exam</span>
   <span class="top-bar-grade" aria-live="polite" aria-atomic="true" id="topbar-grade">Grade: —</span>
+  <button class="btn btn-ghost btn-sm" onclick="downloadSave()"
+    style="font-size:.8rem;padding:.35rem .9rem;border-color:var(--teal);color:var(--teal);"
+    title="Download your progress as a file to use on another computer">
+    &#8681; Save to file
+  </button>
+  <button class="btn btn-ghost btn-sm" onclick="confirmEarlySubmit()"
+    style="font-size:.8rem;padding:.35rem .9rem;border-color:var(--muted);color:var(--muted);"
+    title="Stop here and submit your current grade">
+    Submit what I have
+  </button>
 </header>
 <div class="shell q-screen">
   <nav aria-label="Exam progress by domain">
@@ -312,6 +364,11 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
     </button>
     <button class="btn btn-ghost btn-sm" id="retryBtn" onclick="retry()" style="display:none">
       Retry this question
+    </button>
+    <button class="btn btn-ghost btn-sm" id="skipBtn" onclick="skipDomain()"
+      style="color:var(--muted);border-color:var(--muted);font-size:.8rem;"
+      title="Leave this section and move to the next domain">
+      Skip this section &rarr;
     </button>
   </div>
 </div>
@@ -593,6 +650,44 @@ function loadQ(){
 
 function g(id){return document.getElementById(id)}
 
+// Check for saved session — runs immediately since script is at bottom of body
+(function checkForSavedSession(){
+  const saved = loadProgress();
+  if(saved && saved.name){
+    const banner = g('resumeBanner');
+    const desc = g('resumeDesc');
+    const savedDate = saved.savedAt
+      ? new Date(saved.savedAt).toLocaleString()
+      : 'recently';
+    if(banner && desc){
+      let done = 0;
+      if(saved.data){
+        Object.values(saved.data).forEach(r=>{ if(r.verdict==='demonstrated') done++; });
+      }
+      desc.textContent = saved.name + ' — saved ' + savedDate
+        + '. ' + done + ' of 18 question slots completed.';
+      banner.style.display = 'block';
+      const nameField = g('student-name');
+      if(nameField) nameField.value = saved.name;
+    }
+  }
+})();
+
+function doResume(){
+  const saved = loadProgress();
+  if(saved) resumeExam(saved);
+}
+
+function doFresh(){
+  if(confirm('This will clear your saved progress and start a new exam. Are you sure?')){
+    clearProgress();
+    g('resumeBanner').style.display = 'none';
+    g('student-name').value = '';
+  }
+}
+
+
+
 function toggleGuidance(){
   const content=g('guidanceContent');
   const arrow=g('guidanceArrow');
@@ -651,6 +746,7 @@ async function submitResponse(){
     else{g('retryBtn').style.display='inline-flex';g('nextBtn').style.display='none';}
     g('askBtn').style.display='none';
     updateMap(); updateGradeBar();
+    saveProgress();
   }catch(e){
     clearTimeout(timeoutId);
     btn.disabled=false; btn.textContent='Try Again →';
@@ -720,10 +816,153 @@ function showVerdict(verdict,reply){
 }
 
 // ── NAV ────────────────────────────────────────────────────────────────────────
+function skipDomain(){
+  // Move to the first question of the next domain, skipping remaining levels
+  if(S.di < DOMAINS.length - 1){
+    S.di++;
+    S.li = 0;
+    saveProgress();
+    loadQ();
+  } else {
+    // On last domain — offer to submit
+    if(confirm('You are on the last section. Submit what you have completed?')){
+      generateCompletion();
+    }
+  }
+}
+
+// ── LOCALSTORAGE PERSISTENCE ──────────────────────────────────────────────────
+const SAVE_KEY = 'ebb_exam_v1';
+
+function saveProgress(){
+  if(!S.name) return;
+  try {
+    const snapshot = {
+      name: S.name,
+      startTime: S.startTime,
+      di: S.di,
+      li: S.li,
+      data: S.data,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
+  } catch(e){ /* storage may be unavailable */ }
+}
+
+function loadProgress(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  } catch(e){ return null; }
+}
+
+function clearProgress(){
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+}
+
+function resumeExam(snapshot){
+  S.name = snapshot.name;
+  S.startTime = snapshot.startTime ? new Date(snapshot.startTime) : new Date();
+  S.di = snapshot.di || 0;
+  S.li = snapshot.li || 0;
+  S.data = snapshot.data || {};
+  // Ensure all slots exist
+  DOMAINS.forEach(d=>LEVELS.forEach(l=>{
+    const k=dk(d.id,l);
+    if(!S.data[k]) S.data[k]={response:'',verdict:'',attempts:0,feedback:'',questionIdx:undefined};
+  }));
+  show('screen-question');
+  loadQ();
+}
+
+function downloadSave(){
+  // Build the same snapshot saveProgress uses
+  const snapshot = {
+    name: S.name || 'student',
+    startTime: S.startTime,
+    di: S.di,
+    li: S.li,
+    data: S.data,
+    savedAt: new Date().toISOString(),
+    version: 1
+  };
+  const json = JSON.stringify(snapshot, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = (S.name||'progress').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  a.href = url;
+  a.download = 'ebb_exam_' + safeName + '.ebbsave';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function uploadSaveFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const status = g('uploadStatus');
+  status.style.display = 'block';
+  status.textContent = 'Reading file...';
+  status.style.color = 'var(--muted)';
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const snapshot = JSON.parse(e.target.result);
+      if(!snapshot.name || !snapshot.data){
+        throw new Error('This does not appear to be a valid EBB exam save file.');
+      }
+      // Store in localStorage so resumeExam can use it
+      localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
+      status.textContent = '\u2713 Progress loaded for ' + snapshot.name
+        + '. Click "Resume where I left off" above, or click the button below.';
+      status.style.color = 'var(--teal)';
+
+      // Show the resume banner with this file's data
+      const banner = g('resumeBanner');
+      const desc = g('resumeDesc');
+      if(banner && desc){
+        let done = 0;
+        Object.values(snapshot.data||{}).forEach(r=>{
+          if(r.verdict==='demonstrated') done++;
+        });
+        desc.textContent = snapshot.name + ' — ' + done
+          + ' of 18 question slots completed.';
+        banner.style.display = 'block';
+        const nameField = g('student-name');
+        if(nameField) nameField.value = snapshot.name;
+      }
+    } catch(err){
+      status.textContent = 'Could not read this file: ' + err.message;
+      status.style.color = 'var(--red)';
+    }
+  };
+  reader.onerror = function(){
+    status.textContent = 'Could not read the file. Please try again.';
+    status.style.color = 'var(--red)';
+  };
+  reader.readAsText(file);
+  // Reset the input so the same file can be re-uploaded if needed
+  event.target.value = '';
+}
+
+function confirmEarlySubmit(){
+  const grade=computeGrade();
+  const inProgress=grade.letter==='In Progress';
+  const msg=inProgress
+    ?`You haven't completed all the questions yet, so your current grade is In Progress. Your instructor will still see everything you've done.\n\nYou can also just close this tab and come back later to continue — but note that progress is only saved in this browser session.\n\nSubmit now with your current results?`
+    :`Your current grade is ${grade.letter}.\n${grade.desc}\n\nYou can keep going to try to improve it, or submit now. Submit with your current grade?`;
+  if(confirm(msg)) generateCompletion();
+}
+
 function advance(){
   if(S.li<LEVELS.length-1){S.li++;}
   else if(S.di<DOMAINS.length-1){S.di++;S.li=0;}
   else{generateCompletion();return;}
+  saveProgress();
   loadQ();
 }
 
@@ -755,14 +994,34 @@ function updateMap(){
     pips.className='pip-row'; pips.setAttribute('aria-label','Domain '+d.id+' progress');
     LEVELS.forEach((l,li)=>{
       const v=getV(d.id,l);
-      const pip=document.createElement('div');
-      pip.className='pip'+(v==='demonstrated'?' done':v==='partial'?' partial':'')+(di===S.di&&li===S.li?' current':'');
+      const isCurrent=(di===S.di&&li===S.li);
+      const pip=document.createElement('button');
+      pip.type='button';
+      pip.className='pip'+(v==='demonstrated'?' done':v==='partial'?' partial':'')+(isCurrent?' current':'');
       pip.textContent=LV_LABEL[l][0];
-      pip.setAttribute('aria-label',LV_LABEL[l]+': '+(v||'not attempted'));
+      pip.setAttribute('aria-label', LV_LABEL[l]+': '+(v||'not attempted')+(isCurrent?' (current)':' — click to go here'));
+      pip.title=(isCurrent?'Current: ':'')+d.name+' — '+LV_LABEL[l]+(v?' ('+v+')':' (not yet attempted)');
+      pip.style.cssText='cursor:pointer;font-family:var(--sans);border:none;padding:0;';
+      pip.onclick=(function(ddi,lli){return function(){navigateTo(ddi,lli);};})(di,li);
       pips.appendChild(pip);
     });
     cell.appendChild(pips); map.appendChild(cell);
   });
+}
+
+function navigateTo(di,li){
+  if(di===S.di && li===S.li) return;
+  const textarea=g('responseArea');
+  if(textarea && textarea.value.trim().length>10){
+    const key=dk(DOMAINS[S.di].id, LEVELS[S.li]);
+    if(S.data[key] && !S.data[key].response){
+      S.data[key].response='[Draft not submitted]';
+    }
+  }
+  S.di=di; S.li=li;
+  saveProgress();
+  loadQ();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function computeGrade(){
@@ -794,6 +1053,7 @@ function updatePB(){
 
 // ── COMPLETION ─────────────────────────────────────────────────────────────────
 function generateCompletion(){
+  clearProgress(); // exam is done — no need to save anymore
   show('screen-completion');
   const grade=computeGrade();
   g('finalGradeLetter').textContent=grade.letter;
