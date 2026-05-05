@@ -270,11 +270,20 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
   </div>
   <span class="level-badge" id="levelBadge" tabindex="-1" aria-live="polite"></span>
   <div class="question-text" id="questionText" role="region" aria-label="Question"></div>
-  <!-- Visible guidance showing what a complete answer includes -->
-  <details id="guidanceBox" style="background:rgba(13,94,87,.06);border:1px solid rgba(13,94,87,.2);border-radius:.5rem;padding:.75rem 1.1rem;margin-bottom:1.25rem;">
-    <summary style="font-family:var(--sans);font-size:.85rem;font-weight:700;color:var(--teal);cursor:pointer;list-style:none;">&#9654; What the Companion looks for in a complete response</summary>
-    <p id="guidanceText" style="font-size:1rem;color:var(--ink2);line-height:1.75;margin-top:.6rem"></p>
-  </details>
+  <!-- Guidance box — JS toggle, no details/summary dependency -->
+  <div id="guidanceBox" style="background:rgba(13,94,87,.06);border:1px solid rgba(13,94,87,.2);border-radius:.5rem;margin-bottom:1.25rem;overflow:hidden;">
+    <button id="guidanceToggle" onclick="toggleGuidance()" aria-expanded="false" aria-controls="guidanceContent"
+      style="width:100%;text-align:left;background:none;border:none;
+             padding:.75rem 1.1rem;cursor:pointer;
+             font-family:var(--sans);font-size:.88rem;font-weight:700;
+             color:var(--teal);display:flex;align-items:center;gap:.5rem;">
+      <span id="guidanceArrow" style="font-size:.75rem;transition:transform .2s;display:inline-block;">&#9654;</span>
+      What the Companion looks for in a complete response
+    </button>
+    <div id="guidanceContent" style="display:none;padding:0 1.1rem 1rem 1.1rem;">
+      <p id="guidanceText" style="font-size:1rem;color:var(--ink2);line-height:1.75;margin:0;"></p>
+    </div>
+  </div>
   <div class="prev-wrap" id="prevWrap" style="display:none">
     <p class="prev-label">Your previous response:</p>
     <div class="prev-text" id="prevText"></div>
@@ -559,6 +568,7 @@ function loadQ(){
   const guidanceEl=g('guidanceText');
   if(guidanceEl && GUIDANCE[level] && GUIDANCE[level][domain.id]){
     guidanceEl.textContent=GUIDANCE[level][domain.id];
+    openGuidance();
   }
   g('responseArea').value=''; g('charCount').textContent='0 / 3000 characters';
 
@@ -574,7 +584,29 @@ function loadQ(){
   setTimeout(()=>g('levelBadge').focus(),100);
 }
 
-function g(id){return document.getElementById(id)}
+function toggleGuidance(){
+  const content=g('guidanceContent');
+  const arrow=g('guidanceArrow');
+  const btn=g('guidanceToggle');
+  const isOpen=content.style.display!=='none';
+  content.style.display=isOpen?'none':'block';
+  arrow.style.transform=isOpen?'':'rotate(90deg)';
+  btn.setAttribute('aria-expanded',String(!isOpen));
+}
+
+// Auto-open guidance when a new question loads
+function openGuidance(){
+  const content=g('guidanceContent');
+  const arrow=g('guidanceArrow');
+  const btn=g('guidanceToggle');
+  if(content&&content.style.display==='none'){
+    content.style.display='block';
+    arrow.style.transform='rotate(90deg)';
+    btn&&btn.setAttribute('aria-expanded','true');
+  }
+}
+
+
 function updateCC(){g('charCount').textContent=g('responseArea').value.length+' / 3000 characters';}
 
 // ── SUBMIT ─────────────────────────────────────────────────────────────────────
