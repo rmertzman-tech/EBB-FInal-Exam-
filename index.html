@@ -214,7 +214,9 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
   <div class="info-box">
     <span class="info-box-label">How this works</span>
     <p>You will work through six concept areas from the Ethics Beyond Boundaries course. In each area you answer three questions: one that checks whether you can identify and explain the concept, one that checks whether you can apply it to a real case, and one that asks you to connect it to your own experience.</p>
-    <p>After each response, the Companion will tell you what you demonstrated and, if something is missing, ask a question that points toward it. You can retry any question as many times as you need — but each retry must add new specific evidence, not just restate what you already wrote.</p>
+    <p>Before you write, you will see a teal box titled <strong>"What the Companion looks for in a complete response."</strong> Read this before you write — it tells you exactly what a complete answer includes. The Companion's assessment is based on those criteria, so knowing them upfront is part of how this works.</p>
+    <p>After you submit, the Companion will tell you what you demonstrated and — if something is missing — ask you a specific question to help you add it. This is a conversation, not a test. The Companion will never tell you that you "forgot" something or "should have included" something that wasn't in the guidance. If it asks a follow-up question, it is inviting you to go deeper, not penalizing you for what you wrote.</p>
+    <p>You can retry any question as many times as you need. Each retry should add something new — not just restate what you already wrote.</p>
     <p>There is no time limit. Your instructor has posted a submission due date on Canvas.</p>
   </div>
 
@@ -268,6 +270,11 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
   </div>
   <span class="level-badge" id="levelBadge" tabindex="-1" aria-live="polite"></span>
   <div class="question-text" id="questionText" role="region" aria-label="Question"></div>
+  <!-- Visible guidance showing what a complete answer includes -->
+  <details id="guidanceBox" style="background:rgba(13,94,87,.06);border:1px solid rgba(13,94,87,.2);border-radius:.5rem;padding:.75rem 1.1rem;margin-bottom:1.25rem;">
+    <summary style="font-family:var(--sans);font-size:.85rem;font-weight:700;color:var(--teal);cursor:pointer;list-style:none;">&#9654; What the Companion looks for in a complete response</summary>
+    <p id="guidanceText" style="font-size:1rem;color:var(--ink2);line-height:1.75;margin-top:.6rem"></p>
+  </details>
   <div class="prev-wrap" id="prevWrap" style="display:none">
     <p class="prev-label">Your previous response:</p>
     <div class="prev-text" id="prevText"></div>
@@ -342,7 +349,35 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
 
 </main>
 <script>
-// ── QUESTION BANK ──────────────────────────────────────────────────────────────
+// Guidance text shown to students before they write — must match what Companion assesses
+const GUIDANCE = {
+  recognition:{
+    1:"Name the concept and explain it in your own words. You don't need to use the exact technical term — what matters is showing you understand what it is and why it exists. A complete response includes: what the concept is, what it is made of or where it comes from, and why it matters for how people see the same situation differently.",
+    2:"Name at least one of the two coordination systems EBB describes and explain what makes it work or fail. A complete response includes: what the system requires from the people using it, when it works well, and when it breaks down.",
+    3:"Name the concept and explain what makes it different from simply a 'bad institution' or a 'failing organization.' A complete response includes: what is happening on the surface (visible functioning) and what is happening underneath (internal depletion), and why the gap between these two is what makes it dark rather than just bad.",
+    4:"Name the concept and explain it as a biological or structural reality, not a character failing. A complete response includes: what happens to a person's thinking when this occurs, what kinds of situations produce it, and why it is not the person's fault.",
+    5:"Name at least three of the four ethical frameworks and describe what each one cares about most. A complete response includes a specific example of how each framework would approach the same situation differently.",
+    6:"Name the concept and explain what makes something a constructor rather than just a good effort or a well-intentioned program. A complete response includes: what a constructor reliably produces, and what a real example (Green Belt Movement or Bridges of America) shows about how one works."
+  },
+  application:{
+    1:"Apply the PRF concept to the specific case described. A complete response identifies what each person's dominant moral foundation likely is, explains why their different foundations lead them to see the situation differently, and names what kind of coordination failure is happening.",
+    2:"Apply the OS1/OS2 distinction to the specific case described. A complete response identifies what kind of coordination failure is occurring, explains why more arguments are unlikely to help, and proposes a specific shared task that both sides could endorse for their own reasons.",
+    3:"Apply the structural framework to the specific institutional case described. A complete response identifies the type of intervention being proposed, explains why it is or is not likely to raise the institution's recovery ceiling, and names what type of change would actually be required.",
+    4:"Apply the EBB framework to the specific scenario described. A complete response distinguishes between a structural explanation and a character explanation for what happened, and states which explanation EBB supports and why.",
+    5:"Apply the SAGE method to the specific situation described. A complete response works through each step, identifies where the different ethical frameworks diverge, and explains what the EBB structural analysis adds that framework analysis alone does not.",
+    6:"Apply the basin and transition concepts to a specific real example. A complete response identifies whether the example is a within-basin effort or a Basin Transition attempt, and explains what would actually be required for a genuine Basin Transition."
+  },
+  integration:{
+    1:"Apply the concept to a real, specific relationship or institution in your own life. A complete response names specific people or situations, gives concrete examples of the concept appearing in your experience, and reflects honestly on what understanding the framework has changed for you.",
+    2:"Describe a real situation from your own life where OS1 or OS2 coordination was at stake. A complete response is specific (a real moment, not a general description), honest about what actually happened, and connects the structural concept to your specific experience.",
+    3:"Apply the diagnostic to a real institution you know from the inside. A complete response provides specific evidence for both the visible functioning and the internal depletion, names which structural parameter is the primary driver, and explains what a structural repair would require.",
+    4:"Describe a specific real situation from your own life where your gate closed or your agency was extracted or your capacity to think clearly was compressed. A complete response is specific and honest, distinguishes between structural conditions and personal factors, and names what structural condition would have made a difference.",
+    5:"Apply multiple ethical frameworks to a real ethical conflict from your own life. A complete response is honest (a real conflict, not a comfortable one), shows where the frameworks agree and disagree, and connects your natural framework preference to your PRF.",
+    6:"Make a specific, honest commitment about something you intend to build, protect, or maintain in your institutional life. A complete response names the specific thing, who it serves, and what structural conditions you need to maintain to make it reliable rather than occasional."
+  }
+};
+
+
 const DOMAINS=[
 {id:1,name:"Who You Are and How You See",
  badge:"Domain 1 of 6",
@@ -519,6 +554,12 @@ function loadQ(){
   lb.className='level-badge '+LV_CLASS[lv];
 
   g('questionText').textContent=qs[qi];
+
+  // Show guidance text matching this domain and level
+  const guidanceEl=g('guidanceText');
+  if(guidanceEl && GUIDANCE[level] && GUIDANCE[level][domain.id]){
+    guidanceEl.textContent=GUIDANCE[level][domain.id];
+  }
   g('responseArea').value=''; g('charCount').textContent='0 / 3000 characters';
 
   const pw=g('prevWrap');
@@ -591,17 +632,19 @@ function buildSys(dom,lv,isRetry){
 Domain: ${dom.name} | Level: ${LV_LABEL[lv]}
 ${li[lv]}
 
+CRITICAL INSTRUCTION: The student was shown a guidance box telling them what a complete response includes. Your job when a response is incomplete is NOT to list what they missed — that creates an unfair gotcha experience. Instead, ask ONE specific question that invites them to provide the missing element naturally.
+
 RESPONSE FORMAT — begin with exactly one of these:
 VERDICT: DEMONSTRATED
 VERDICT: PARTIALLY DEMONSTRATED
 VERDICT: NOT YET
 
 Then 3–5 sentences:
-- DEMONSTRATED: Name specifically what was shown. For Integration, ask one final deepening question.
-- PARTIALLY DEMONSTRATED: Name what was shown well. Name specifically what is missing. Ask one guiding question pointing toward the gap without giving the answer.
-- NOT YET: Be encouraging. Redirect to the concept without giving the answer. Ask a simpler entry question.
+- DEMONSTRATED: Tell them specifically what they demonstrated well. For Integration level, ask one final deepening question to extend the insight.
+- PARTIALLY DEMONSTRATED: Briefly acknowledge what they showed. Then ask ONE specific question that points toward what would make the response complete — without stating what is missing. The question should be answerable by someone who understands the concept. Example: not "you forgot to explain X" but "Can you say a bit more about whether this was something they chose, or something that happened to them?"
+- NOT YET: Be warm and encouraging. Ask one simpler entry question that gives them a way in — something concrete and personal that would get the conversation started.
 
-Under 180 words total. Plain, warm language.${isRetry?' This is a retry — acknowledge the student is continuing to work on it.':''}`;
+Under 160 words total. Plain, conversational language — this is a dialogue, not a grading rubric.${isRetry?' This is a retry — briefly acknowledge they are continuing to work on it, then move directly to the question.':''}`;
 }
 
 function buildMsg(q,resp,isRetry,prev){
